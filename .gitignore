@@ -16,6 +16,7 @@ htmlcov/
 # Build artifacts
 build/
 dist/
+artifacts/
 
 # Editors
 .idea/
