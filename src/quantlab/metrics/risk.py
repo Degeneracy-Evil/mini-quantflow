@@ -14,10 +14,14 @@ def annualized_volatility(returns: pd.Series, periods_per_year: int = 252) -> fl
 
 
 def drawdown_series(returns: pd.Series) -> pd.Series:
-    """Compute percentage decline from the running equity peak."""
+    """Compute percentage decline from the running equity peak.
+
+    Initial capital is a peak of 1.0, so a loss in the first observed period is
+    immediately a drawdown rather than becoming the series' starting peak.
+    """
 
     equity = (1.0 + returns.fillna(0.0)).cumprod()
-    peak = equity.cummax()
+    peak = equity.cummax().clip(lower=1.0)
     return equity / peak - 1.0
 
 

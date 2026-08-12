@@ -41,10 +41,23 @@ def feature_panels(prices: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
 
 def backtest_scores(prices: pd.DataFrame, scores: pd.DataFrame, quantile: float = 0.2) -> BacktestResult:
-    """Rank scores, make a long-short portfolio, and apply modest linear costs."""
+    """Backtest scores only over the interval where predictions are available.
+
+    The interval includes one price row after the final score so that the final
+    decision can earn its next-period return. Excluding the warm-up or training
+    interval prevents zero-return cash periods from diluting annualized metrics.
+    """
 
     conventional_returns = prices.pct_change(fill_method=None)
     aligned_scores = scores.reindex(index=prices.index, columns=prices.columns)
+    available = aligned_scores.notna().any(axis=1).to_numpy()
+    available_positions = available.nonzero()[0]
+    if len(available_positions) == 0:
+        raise ValueError("scores contain no observations aligned with prices")
+    start = int(available_positions[0])
+    stop = min(int(available_positions[-1]) + 2, len(prices))
+    conventional_returns = conventional_returns.iloc[start:stop]
+    aligned_scores = aligned_scores.iloc[start:stop]
     signal = ranking_signal(aligned_scores, quantile).fillna(0.0)
     weights = long_short_equal_weight(signal)
     return run_backtest(conventional_returns, weights, costs=TransactionCostModel(2.0, 3.0))
