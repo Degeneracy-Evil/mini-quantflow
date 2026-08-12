@@ -1,21 +1,54 @@
 [project]
-name = "base-py"
+name = "mini-quantflow"
 version = "0.1.0"
-description = "Personal Python project template"
+description = "A small, readable, end-to-end quantitative research lab for learning"
+readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+license = { file = "LICENSE" }
+dependencies = [
+    "matplotlib>=3.9",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+]
+
+[project.optional-dependencies]
+akshare = ["akshare>=1.14"]
+mlp = ["torch>=2.4"]
 
 [dependency-groups]
 dev = [
     "mypy>=2.3.0",
+    "pandas-stubs>=2.2",
     "pre-commit>=4.6.0",
     "pytest>=8.4.2",
     "pytest-cov>=6.2.1",
     "ruff>=0.12.7",
+    "torch>=2.4",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quantlab"]
+
 [tool.uv]
-package = false
+package = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 target-version = "py312"
@@ -53,7 +86,9 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["ANN201"]
+"tests/**/*.py" = ["ANN201", "S101"]
+"experiments/**/*.py" = ["T201"]
+"src/quantlab/models/mlp.py" = ["ANN401"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -65,6 +100,14 @@ files = ["src", "tests", "scripts"]
 mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["akshare", "sklearn.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disable_error_code = ["operator", "unreachable"]
 
 [tool.pytest.ini_options]
 addopts = [
@@ -81,7 +124,11 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+source = ["quantlab"]
+omit = [
+    "src/quantlab/data/akshare_source.py",
+    "src/quantlab/visualization/*",
+]
 
 [tool.coverage.report]
 fail_under = 90
