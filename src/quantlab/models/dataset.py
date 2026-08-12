@@ -104,6 +104,8 @@ def prediction_panel(dataset: pd.DataFrame, predictions: pd.Series) -> pd.DataFr
 
     if len(dataset) != len(predictions):
         raise ValueError("prediction count must match dataset rows")
+    if not dataset.index.equals(predictions.index):
+        raise ValueError("prediction index must exactly match dataset row index")
     frame = dataset[["timestamp", "asset"]].copy()
     frame["prediction"] = predictions.to_numpy()
     if frame.duplicated(["timestamp", "asset"]).any():

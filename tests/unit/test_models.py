@@ -120,6 +120,8 @@ def test_prediction_panels_and_metrics(close_prices: pd.DataFrame) -> None:
     assert classes == {"accuracy": 2 / 3, "precision": 1.0, "recall": 0.5}
     with pytest.raises(ValueError, match="count"):
         prediction_panel(dataset, prediction.iloc[:-1])
+    with pytest.raises(ValueError, match="exactly match"):
+        prediction_panel(dataset, prediction.iloc[::-1])
     with pytest.raises(ValueError, match="indexes"):
         regression_metrics(dataset["target"], prediction.reset_index(drop=True).set_axis(range(1, len(prediction) + 1)))
 
