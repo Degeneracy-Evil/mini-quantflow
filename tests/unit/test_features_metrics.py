@@ -83,6 +83,12 @@ def test_performance_metrics_have_hand_calculable_values() -> None:
     assert np.isfinite(sharpe_ratio(returns, periods_per_year=4))
 
 
+def test_first_period_loss_is_a_drawdown_from_initial_capital() -> None:
+    returns = pd.Series([-0.1, 0.05])
+    assert drawdown_series(returns).tolist() == pytest.approx([-0.1, -0.055])
+    assert maximum_drawdown(returns) == pytest.approx(-0.1)
+
+
 def test_metric_empty_and_edge_cases() -> None:
     empty = pd.Series(dtype=float)
     assert math.isnan(annualized_return(empty))
