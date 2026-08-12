@@ -104,6 +104,8 @@ def test_signals_and_weight_construction() -> None:
     long_short = long_short_equal_weight(ranks)
     assert long_short.sum(axis=1).tolist() == pytest.approx([0.0, 0.0])
     assert long_short.abs().sum(axis=1).tolist() == pytest.approx([2.0, 2.0])
+    one_sided = long_short_equal_weight(pd.DataFrame([[1.0, 0.0], [0.0, -1.0]]))
+    assert one_sided.eq(0.0).all().all()
     assert equal_weight(ranks).sum(axis=1).tolist() == pytest.approx([1.0, 1.0])
     assert long_only_top_k(scores, 2).sum(axis=1).tolist() == pytest.approx([1.0, 1.0])
 

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import pandas as pd
 from common import artifact_path, print_metrics
 
 from quantlab.backtest import TransactionCostModel, run_backtest
 from quantlab.data import SyntheticDataSource, SyntheticMarketConfig, close_matrix
+from quantlab.data.synthetic import MarketKind
 from quantlab.features.momentum import momentum
 from quantlab.portfolio.construction import equal_weight
 from quantlab.visualization.equity import plot_equity_curves
@@ -16,9 +18,10 @@ def main() -> None:
     """Show that one strategy behaves differently under different processes."""
 
     config = SyntheticMarketConfig(periods=504, assets=30, drift=0.001, seed=7)
-    curves = {}
-    for kind in ("trend", "random"):
-        prices = close_matrix(SyntheticDataSource(kind, config).load())  # type: ignore[arg-type]
+    curves: dict[str, pd.Series] = {}
+    kinds: tuple[MarketKind, ...] = ("trend", "random")
+    for kind in kinds:
+        prices = close_matrix(SyntheticDataSource(kind, config).load())
         # Own past return controls long/flat exposure. A cross-sectional
         # dollar-neutral portfolio would cancel the common drift that this
         # experiment is designed to reveal.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Self
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -28,6 +30,7 @@ def test_dataset_target_alignment(close_prices: pd.DataFrame) -> None:
     row = dataset[(dataset["timestamp"] == close_prices.index[1]) & (dataset["asset"] == "A")].iloc[0]
     assert row["momentum_1"] == pytest.approx(0.01)
     assert row["target"] == pytest.approx(103 / 101 - 1)
+    assert row["target_timestamp"] == close_prices.index[2]
     assert dataset.equals(dataset.sort_values(["timestamp", "asset"]).reset_index(drop=True))
 
 
@@ -50,6 +53,16 @@ def test_chronological_split_never_mixes_dates(close_prices: pd.DataFrame) -> No
     split = chronological_split(_dataset(close_prices), 0.5, 0.25)
     assert split.train["timestamp"].max() < split.validation["timestamp"].min()
     assert split.validation["timestamp"].max() < split.test["timestamp"].min()
+
+
+def test_chronological_split_purges_unavailable_multiperiod_labels() -> None:
+    index = pd.date_range("2024-01-01", periods=20, freq="B")
+    prices = pd.DataFrame({"A": 100.0 + np.arange(20), "B": 80.0 + np.arange(20)}, index=index)
+    features = {"momentum_1": momentum(prices, 1)}
+    split = chronological_split(build_supervised_dataset(prices, features, horizon=3), 0.5, 0.25)
+
+    assert split.train["target_timestamp"].max() <= split.validation["timestamp"].min()
+    assert split.validation["target_timestamp"].max() <= split.test["timestamp"].min()
 
 
 def test_classical_models(close_prices: pd.DataFrame) -> None:
@@ -96,6 +109,32 @@ def test_walk_forward_splits_and_predictions() -> None:
     predictions = walk_forward_predict(rows, LinearRegression, config)
     assert predictions.index.min() == 3
     assert predictions.iloc[-1] == pytest.approx(14.0)
+
+
+def test_walk_forward_uses_only_observable_labels() -> None:
+    dates = pd.date_range("2024-01-01", periods=6)
+    rows = pd.DataFrame(
+        {
+            "timestamp": dates,
+            "target_timestamp": [dates[2], dates[3], dates[4], dates[5], dates[5], dates[5]],
+            "asset": "A",
+            "x": np.arange(6, dtype=float),
+            "target": np.arange(6, dtype=float),
+        }
+    )
+    observed_training_rows: list[list[int]] = []
+
+    class RecordingRegressor:
+        def fit(self, _features: pd.DataFrame, target: pd.Series) -> Self:
+            observed_training_rows.append(target.index.tolist())
+            return self
+
+        def predict(self, features: pd.DataFrame) -> np.ndarray:
+            return np.zeros(len(features))
+
+    walk_forward_predict(rows, RecordingRegressor, WalkForwardConfig(3, test_periods=1))
+
+    assert observed_training_rows[0] == [0, 1]
 
 
 def test_walk_forward_validation() -> None:

@@ -15,12 +15,14 @@ def equal_weight(signal: pd.DataFrame) -> pd.DataFrame:
 
 
 def long_short_equal_weight(signal: pd.DataFrame, gross_each_side: float = 1.0) -> pd.DataFrame:
-    """Equally weight long and short selections with zero target net exposure."""
+    """Equally weight both sides, staying in cash when either side is absent."""
 
     if gross_each_side <= 0:
         raise ValueError("gross_each_side must be positive")
     signed = pd.DataFrame(np.sign(signal.to_numpy()), index=signal.index, columns=signal.columns)
-    return normalize_long_short(signed, gross_each_side, gross_each_side)
+    weights = normalize_long_short(signed, gross_each_side, gross_each_side)
+    has_both_sides = signed.gt(0.0).any(axis=1) & signed.lt(0.0).any(axis=1)
+    return weights.where(has_both_sides, 0.0, axis=0)
 
 
 def long_only_top_k(scores: pd.DataFrame, k: int = 10) -> pd.DataFrame:

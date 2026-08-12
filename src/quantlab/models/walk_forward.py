@@ -15,8 +15,15 @@ from quantlab.models.dataset import feature_columns
 class Regressor(Protocol):
     """Minimal estimator interface needed by walk-forward training."""
 
-    fit: Callable[[pd.DataFrame, pd.Series], Self]
-    predict: Callable[[pd.DataFrame], np.ndarray]
+    def fit(self, features: pd.DataFrame, target: pd.Series) -> Self:
+        """Fit the estimator and return itself."""
+
+        ...
+
+    def predict(self, features: pd.DataFrame) -> np.ndarray:
+        """Predict one value per feature row."""
+
+        ...
 
 
 @dataclass(frozen=True)
@@ -57,7 +64,7 @@ def walk_forward_predict(
     estimator_factory: Callable[[], Regressor],
     config: WalkForwardConfig,
 ) -> pd.Series:
-    """Fit only past rows and return stitched, genuinely out-of-sample predictions."""
+    """Fit only labels known by each test start and return out-of-sample predictions."""
 
     if dataset.empty:
         raise ValueError("dataset must not be empty")
@@ -65,9 +72,13 @@ def walk_forward_predict(
     predictions = pd.Series(np.nan, index=dataset.index, name="prediction", dtype=float)
     for train_dates, test_dates in walk_forward_splits(dataset["timestamp"], config):
         train_mask = dataset["timestamp"].isin(train_dates)
+        if "target_timestamp" in dataset:
+            train_mask &= pd.to_datetime(dataset["target_timestamp"]).le(test_dates[0])
         test_mask = dataset["timestamp"].isin(test_dates) & predictions.isna()
         if not test_mask.any():
             continue
+        if not train_mask.any():
+            raise ValueError("no training labels are observable by the start of the test window")
         model = estimator_factory()
         model.fit(dataset.loc[train_mask, columns], dataset.loc[train_mask, "target"])
         predictions.loc[test_mask] = model.predict(dataset.loc[test_mask, columns])

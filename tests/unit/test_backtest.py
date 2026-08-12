@@ -60,3 +60,17 @@ def test_portfolio_gross_return_preserves_missing_final_row() -> None:
     result = portfolio_gross_return(forward, weights)
     assert result.iloc[0] == pytest.approx(0.1)
     assert pd.isna(result.iloc[1])
+
+
+def test_backtest_rejects_missing_return_for_held_asset() -> None:
+    index = pd.date_range("2024-01-01", periods=3)
+    returns = pd.DataFrame({"A": [0.0, 0.1, 0.1], "B": [0.0, float("nan"), 0.1]}, index=index)
+    weights = pd.DataFrame(0.5, index=index, columns=returns.columns)
+
+    with pytest.raises(ValueError, match="non-zero weights"):
+        run_backtest(returns, weights)
+
+    # Missing returns are harmless for assets that are not held.
+    weights["B"] = 0.0
+    result = run_backtest(returns, weights)
+    assert result.period_returns.tolist() == pytest.approx([0.05, 0.05])

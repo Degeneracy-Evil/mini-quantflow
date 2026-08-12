@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import pandas as pd
 from common import artifact_path, backtest_scores, print_metrics
 
 from quantlab.data import close_matrix
@@ -18,7 +19,7 @@ def main() -> None:
     market, factor = factor_market(periods=504, assets=100, factor_premium=0.0007, noise=0.01, seed=19)
     prices = close_matrix(market)
     future = forward_return(prices)
-    if not hasattr(future, "columns"):
+    if not isinstance(future, pd.DataFrame):
         raise TypeError("expected return panel")
     returns = quantile_returns(factor, future)
     summary = summarize_ic(information_coefficient(factor, future))

@@ -61,16 +61,18 @@ def build_supervised_dataset(
     dataset.index.names = ["timestamp", "asset"]
     dataset["target"] = (target > 0).astype(float).where(target.notna()) if classification else target
     dataset = dataset.reset_index().sort_values(["timestamp", "asset"], kind="stable").reset_index(drop=True)
+    target_dates = pd.Series(prices.index[horizon:], index=prices.index[:-horizon])
+    dataset["target_timestamp"] = pd.to_datetime(dataset["timestamp"].map(target_dates))
     feature_names = list(features)
     if drop_missing:
-        dataset = dataset.dropna(subset=[*feature_names, "target"]).reset_index(drop=True)
+        dataset = dataset.dropna(subset=[*feature_names, "target", "target_timestamp"]).reset_index(drop=True)
     return dataset
 
 
 def chronological_split(
     dataset: pd.DataFrame, train_fraction: float = 0.6, validation_fraction: float = 0.2
 ) -> ChronologicalSplit:
-    """Split on unique timestamps so assets from one date never cross boundaries."""
+    """Split by time and purge labels unavailable at the next interval's start."""
 
     if "timestamp" not in dataset or "asset" not in dataset:
         raise ValueError("dataset must contain timestamp and asset columns")
@@ -85,9 +87,16 @@ def chronological_split(
     train_dates = timestamps[:train_end]
     validation_dates = timestamps[train_end:validation_end]
     test_dates = timestamps[validation_end:]
+    train_mask = dataset["timestamp"].isin(train_dates)
+    validation_mask = dataset["timestamp"].isin(validation_dates)
+    if "target_timestamp" in dataset:
+        label_dates = pd.to_datetime(dataset["target_timestamp"])
+        next_interval_start = validation_dates[0] if len(validation_dates) else test_dates[0]
+        train_mask &= label_dates.le(next_interval_start)
+        validation_mask &= label_dates.le(test_dates[0])
     return ChronologicalSplit(
-        dataset[dataset["timestamp"].isin(train_dates)].copy(),
-        dataset[dataset["timestamp"].isin(validation_dates)].copy(),
+        dataset[train_mask].copy(),
+        dataset[validation_mask].copy(),
         dataset[dataset["timestamp"].isin(test_dates)].copy(),
     )
 
@@ -95,7 +104,7 @@ def chronological_split(
 def feature_columns(dataset: pd.DataFrame) -> list[str]:
     """Return model input columns from a standard supervised dataset."""
 
-    reserved = {"timestamp", "asset", "target"}
+    reserved = {"timestamp", "asset", "target", "target_timestamp"}
     return [str(column) for column in dataset.columns if column not in reserved]
 
 
